@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The Social Mirror</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          animation: {
+            'fade-in-down': 'fade-in-down 0.5s ease-out forwards',
+            'fade-in': 'fade-in 0.3s ease-out forwards',
+          },
+          keyframes: {
+            'fade-in-down': {
+              '0%': { opacity: '0', transform: 'translateY(-10px)' },
+              '100%': { opacity: '1', transform: 'translateY(0)' },
+            },
+            'fade-in': {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            }
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    @keyframes shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes subtle-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+    .spinner {
+      border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white;
+      border-radius: 50%; width: 1.25rem; height: 1.25rem;
+      animation: spin 1s linear infinite;
+    }
+    .shimmer-effect { position: relative; overflow: hidden; }
+    .shimmer-effect::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(110deg, transparent 40%, rgba(255, 255, 255, 0.25) 50%, transparent 60%);
+      animation: shimmer 3s infinite linear;
+    }
+    .reflection-text::after {
+        content: 'The Social Mirror';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -100%;
+        transform: scaleY(-1);
+        opacity: 0.04;
+        background: linear-gradient(to bottom, white, transparent);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+    }
+    .dark-scrollbar::-webkit-scrollbar { width: 8px; }
+    .dark-scrollbar::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+    .dark-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 10px; }
+    .dark-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.5); }
+    .heatmap-zone { transition: background-color 0.3s ease-in-out; }
+  </style>
+</head>
+<body class="antialiased font-sans bg-slate-900">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // --- DUMMY DATA FOR DEMO ---
+    const dummySocialFeedData = [
+        {
+            id: 'agra-3',
+            type: 'offender', 
+            reporter: { name: 'Vigilant Citizen', avatar: 'https://i.pravatar.cc/150?img=3' },
+            timestamp: '30 minutes ago',
+            title: 'Public Littering Violation',
+            description: 'An individual was reported for littering public property near the main entrance of the Taj Nature Walk. This behavior contributes to the degradation of our city\'s landmarks.',
+            location: 'Taj Nature Walk, Agra',
+            offender: {
+                name: 'Arun Verma',
+                proofUrl: 'https://placehold.co/600x400/fecaca/991b1b?text=Proof+of+Violation',
+                fineStatus: 'Paid',
+            },
+            resolved: true,
+        },
+        {
+            id: 'agra-1',
+            type: 'issue',
+            reporter: { name: 'Priya Sharma', avatar: 'https://i.pravatar.cc/150?img=1' },
+            timestamp: '2 hours ago',
+            title: 'Unattended Waste near Taj Mahal East Gate',
+            description: 'Large amounts of tourist-generated waste are piling up near the East Gate parking area, creating an unsanitary environment unbecoming of a world heritage site.',
+            location: 'Taj Mahal East Gate, Agra',
+            imageUrl: 'https://placehold.co/600x400/ef4444/white?text=Waste+Problem',
+            upvotes: 185,
+            comments: [
+              { user: 'Amit Singh', text: 'This is embarrassing for our city. Needs immediate cleanup.' },
+              { user: 'Sneha Gupta', text: 'Absolutely agree. The authorities must act fast.' }
+            ],
+            resolved: true,
+        },
+        {
+            id: 'agra-2',
+            type: 'issue',
+            reporter: { name: 'Rajesh Kumar', avatar: 'https://i.pravatar.cc/150?img=2' },
+            timestamp: '8 hours ago',
+            title: 'Malfunctioning Traffic Light at Sadar Bazaar',
+            description: 'The main traffic light at the Sadar Bazaar crossing is stuck on red, causing massive traffic jams and chaos, especially during evening hours.',
+            location: 'Sadar Bazaar, Agra',
+            imageUrl: 'https://placehold.co/600x400/f97316/white?text=Traffic+Chaos',
+            upvotes: 92,
+            comments: [
+              { user: 'Deepak Jain', text: 'It took me 30 minutes to cross that signal yesterday. Please fix it!' }
+            ],
+            resolved: false,
+        },
+    ];
+
+    const dummyVolunteerData = [
+        { name: 'Aditya Singh', avatar: 'https://i.pravatar.cc/150?img=5', verifiedCount: 128, badge: 'Gold' },
+        { name: 'Neha Sharma', avatar: 'https://i.pravatar.cc/150?img=6', verifiedCount: 94, badge: 'Silver' },
+        { name: 'Vikram Rathore', avatar: 'https://i.pravatar.cc/150?img=7', verifiedCount: 67, badge: 'Bronze' },
+    ];
+    
+    const dummyLeaderboardData = [
+        { name: 'Priya Sharma', earnings: 4500, title: 'Cleanliness Champion' },
+        { name: 'Rajesh Kumar', earnings: 3000, title: 'City Guardian' },
+        { name: 'Amit Singh', earnings: 1500, title: 'Civic Watchdog' },
+    ];
+
+    // --- ICONS (SVG Components for a clean look) ---
+    const HomeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+    const CameraIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>;
+    const ShieldIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+    const BuildingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01"/><path d="M16 6h.01"/><path d="M12 6h.01"/><path d="M12 10h.01"/><path d="M12 14h.01"/><path d="M16 10h.01"/><path d="M16 14h.01"/><path d="M8 10h.01"/><path d="M8 14h.01"/></svg>;
+    const GlobeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>;
+    const UpvoteIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>;
+    const CommentIcon = () => <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 011.037-.443 48.282 48.282 0 005.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" /></svg>;
+    const ResolvedIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>;
+    const PendingIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" /></svg>;
+    const CloseIcon = () => <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
+
+    // --- GENERIC UI COMPONENTS ---
+    const PageWrapper = ({ children, gradient }) => (
+      <div className={`relative min-h-screen overflow-y-auto overflow-x-hidden ${gradient} text-white`}>
+        <div className="absolute inset-0 bg-slate-900/30"></div>
+        <div className="relative z-10 p-4 sm:p-8">{children}</div>
+      </div>
+    );
+    
+    const BackButton = ({ navigate }) => (
+      <button onClick={() => navigate('home')} className="absolute top-4 left-4 z-20 flex items-center gap-2 text-white/70 hover:text-white transition-colors backdrop-blur-md bg-black/20 p-2 rounded-lg shadow-lg border border-white/10">
+        <HomeIcon />
+        <span className="hidden sm:inline font-semibold">Home</span>
+      </button>
+    );
+    
+    const Notification = ({ message, type }) => {
+      if (!message) return null;
+      const baseClasses = "fixed top-5 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-lg shadow-2xl text-white font-bold backdrop-blur-xl border animate-fade-in-down";
+      const typeClasses = type === 'success' ? 'bg-green-500/50 border-green-400/50' : 'bg-red-500/50 border-red-400/50';
+      return <div className={`${baseClasses} ${typeClasses}`}>{message}</div>;
+    };
+    
+    const AIGlowButton = ({ loading, children, ...props }) => (
+         <button {...props} disabled={loading} className="w-full flex justify-center items-center gap-3 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg hover:from-purple-500 hover:to-indigo-500 font-bold transition-all duration-300 shadow-lg hover:shadow-purple-500/40 disabled:opacity-50 disabled:cursor-not-allowed ring-2 ring-transparent hover:ring-purple-400">
+           {loading ? <div className="spinner"></div> : '✨'}
+           <span>{children}</span>
+         </button>
+      );
+    
+    // --- CHART & MAP COMPONENTS ---
+    const StatusChart = ({ reports }) => {
+        const chartRef = useRef(null);
+        useEffect(() => {
+            const statusCounts = reports.reduce((acc, report) => {
+                acc[report.status] = (acc[report.status] || 0) + 1;
+                return acc;
+            }, {});
+            const ctx = chartRef.current.getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Pending', 'Verified', 'Rejected', 'Resolved'],
+                    datasets: [{
+                        data: [statusCounts.pending || 0, statusCounts.verified || 0, statusCounts.rejected || 0, statusCounts.resolved || 0],
+                        backgroundColor: ['#f59e0b', '#22c55e', '#ef4444', '#3b82f6'],
+                        borderColor: 'rgba(0,0,0,0)',
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: true, position: 'bottom', labels: { color: '#cbd5e1' } } }
+                }
+            });
+            return () => chart.destroy();
+        }, [reports]);
+        return <canvas ref={chartRef}></canvas>;
+    };
+    
+    const TrendChart = ({ reports }) => {
+        const chartRef = useRef(null);
+        useEffect(() => {
+            const last7Days = Array(7).fill(0).map((_, i) => {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                return d.toISOString().split('T')[0];
+            }).reverse();
+
+            const reportCounts = last7Days.map(day => 
+                reports.filter(r => r.createdAt && r.createdAt.startsWith(day)).length
+            );
+
+            const ctx = chartRef.current.getContext('2d');
+            const chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: last7Days.map(d => new Date(d).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})),
+                    datasets: [{
+                        label: 'Reports Submitted',
+                        data: reportCounts,
+                        borderColor: '#818cf8',
+                        backgroundColor: 'rgba(129, 140, 248, 0.2)',
+                        fill: true,
+                        tension: 0.4,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8', stepSize: 1 }, grid: { color: 'rgba(148, 163, 184, 0.1)' } },
+                        x: { ticks: { color: '#94a3b8' }, grid: { display: false } }
+                    }
+                }
+            });
+            return () => chart.destroy();
+        }, [reports]);
+        return <canvas ref={chartRef}></canvas>;
+    };
+    
+    const AgraHeatmap = ({ reports }) => {
+        const zones = {
+            "Taj Ganj": ["Taj Mahal East Gate", "Taj Nature Walk"],
+            "Civil Lines": ["Sanjay Place", "MG Road"],
+            "Kamla Nagar": ["Kamla Nagar"],
+            "Dayalbagh": ["Dayalbagh, Agra"],
+            "Sikandra": ["Sikandra"],
+            "Fatehabad Road": ["Fatehabad Road, Agra", "TDI Mall"],
+        };
+
+        const getZoneCounts = () => {
+            let counts = {};
+            for(const zone in zones) {
+                counts[zone] = 0;
+                zones[zone].forEach(loc => {
+                    const reportCount = reports.filter(r => r.location && r.location.includes(loc)).length;
+                    counts[zone] += reportCount;
+                });
+            }
+            return counts;
+        };
+
+        const zoneCounts = getZoneCounts();
+        const maxCount = Math.max(...Object.values(zoneCounts));
+
+        const getZoneColor = (count) => {
+            if (count === 0) return 'bg-sky-800/30';
+            const intensity = maxCount > 0 ? count / maxCount : 0;
+            if (intensity > 0.66) return 'bg-red-500/80';
+            if (intensity > 0.33) return 'bg-yellow-500/80';
+            return 'bg-green-500/80';
+        };
+
+        return (
+            <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10">
+                <h2 className="text-xl font-bold mb-4 text-slate-200">📍 Civic Issue Heatmap</h2>
+                <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold text-white">
+                    {Object.entries(zoneCounts).map(([zone, count]) => (
+                        <div key={zone} className={`heatmap-zone p-3 rounded-lg border border-white/10 ${getZoneColor(count)}`}>
+                            {zone}
+                            <span className="block text-lg font-bold">{count}</span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+
+    // --- MODAL & TIMELINE COMPONENTS ---
+    const StatusTimeline = ({ report }) => {
+        const steps = [
+            { name: 'Reported', completed: !!report.createdAt, date: report.createdAt },
+            { name: 'Verified', completed: !!report.verifiedAt, date: report.verifiedAt },
+            { name: 'Resolved', completed: !!report.resolvedAt, date: report.resolvedAt },
+        ];
+        return (
+            <div>
+                <h3 className="font-bold text-slate-200 mb-4">Report Timeline</h3>
+                <ol className="relative border-l border-gray-700">                  
+                    {steps.map((step, index) => (
+                        <li key={index} className="mb-6 ml-6">
+                            <span className={`absolute flex items-center justify-center w-6 h-6 rounded-full -left-3 ring-8 ring-slate-800 ${step.completed ? 'bg-green-500' : 'bg-gray-600'}`}>
+                                {step.completed && <svg className="w-2.5 h-2.5 text-white" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 16 12"><path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M1 5.917 5.724 10.5 15 1.5"/></svg>}
+                            </span>
+                            <h3 className={`font-semibold ${step.completed ? 'text-white' : 'text-gray-400'}`}>{step.name}</h3>
+                            {step.completed && <time className="block text-sm font-normal leading-none text-gray-500">{new Date(step.date).toLocaleString('en-IN')}</time>}
+                        </li>
+                    ))}
+                </ol>
+            </div>
+        );
+    };
+
+    const ReportDetailModal = ({ report, onClose }) => {
+        if (!report) return null;
+        const imageUrl = report.image ? `data:image/jpeg;base64,${report.image}` : `https://placehold.co/600x400/334155/E2E8F0?text=${encodeURIComponent(report.title)}`;
+        return (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
+                <div className="bg-slate-800/80 border border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto dark-scrollbar p-6" onClick={e => e.stopPropagation()}>
+                    <div className="flex justify-between items-start">
+                        <h2 className="text-2xl font-bold text-cyan-300 mb-4">{report.title}</h2>
+                        <button onClick={onClose} className="text-gray-400 hover:text-white"><CloseIcon /></button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <img src={imageUrl} alt="Report evidence" className="w-full h-auto rounded-lg mb-4" />
+                            <p className="text-slate-300">{report.description}</p>
+                            <p className="text-sm text-cyan-400 mt-4 font-semibold">📍 {report.location}</p>
+                        </div>
+                        <div>
+                            <StatusTimeline report={report} />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+
+    // --- PAGES ---
+    const HomePage = ({ navigate }) => {
+      const Card = ({ icon, title, description, color, onClick }) => (
+        <div onClick={onClick} className={`cursor-pointer bg-black/20 p-8 rounded-2xl shadow-lg transition-all duration-300 transform hover:-translate-y-2 backdrop-blur-lg border border-white/10 group hover:border-${color}-400/50 hover:shadow-2xl hover:shadow-${color}-500/20`}>
+          <div className="text-center">
+            <div className={`text-5xl mb-6 text-${color}-400 group-hover:animate-subtle-float`}>{icon}</div>
+            <h2 className={`text-2xl font-bold text-${color}-300`}>{title}</h2>
+            <p className="text-gray-300/80 mt-2">{description}</p>
+          </div>
+        </div>
+      );
+      
+      return (
+        <PageWrapper gradient="bg-gradient-to-br from-gray-900 via-purple-900 to-violet-600">
+          <div className="flex flex-col justify-center items-center min-h-[calc(100vh-4rem)]">
+            <div className="text-center mb-16">
+               <h1 className="relative text-5xl md:text-7xl font-bold bg-gradient-to-r from-cyan-400 to-fuchsia-500 bg-clip-text text-transparent shimmer-effect reflection-text">
+                The Social Mirror
+               </h1>
+               <p className="mt-4 text-gray-300 text-lg">A new standard for civic accountability.</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto w-full">
+              <Card icon={<CameraIcon />} title="Citizen Portal" description="Report civic issues, upload evidence, and be the catalyst for change." color="violet" onClick={() => navigate('citizen')} />
+              <Card icon={<ShieldIcon />} title="Volunteer Hub" description="Verify reports, uphold integrity, and empower your community." color="green" onClick={() => navigate('volunteer')} />
+              <Card icon={<BuildingIcon />} title="Authority Dashboard" description="Access analytics, track progress, and manage resolutions efficiently." color="sky" onClick={() => navigate('authority')} />
+              <Card icon={<GlobeIcon />} title="Public Feed" description="View all verified reports and stay informed about your city." color="amber" onClick={() => navigate('social')} />
+            </div>
+          </div>
+        </PageWrapper>
+      );
+    };
+    
+    const CitizenPage = ({ navigate, showNotification, reports, fetchReports, onReportClick }) => {
+      const [isGenerating, setIsGenerating] = useState(false);
+      const [isAnalyzing, setIsAnalyzing] = useState(false);
+      const [fileName, setFileName] = useState('');
+      const [base64Image, setBase64Image] = useState(null);
+      const [imagePreview, setImagePreview] = useState(null);
+      const [category, setCategory] = useState('General');
+      const formRef = useRef(null); const titleRef = useRef(null); const descriptionRef = useRef(null); const locationRef = useRef(null);
+
+      const REWARD_PER_VERIFIED_REPORT = 500;
+      const myVerifiedReports = reports.filter(r => r.status === 'verified' || r.status === 'resolved').length;
+      const myRejectedReports = reports.filter(r => r.status === 'rejected').length;
+      const credibilityScore = Math.max(0, 100 + (myVerifiedReports * 5) - (myRejectedReports * 10));
+      const totalEarnings = myVerifiedReports * REWARD_PER_VERIFIED_REPORT;
+
+      const fileToBase64 = (file) => new Promise((resolve, reject) => { const reader = new FileReader(); reader.readAsDataURL(file); reader.onload = () => resolve(reader.result.split(',')[1]); reader.onerror = (error) => reject(error); });
+      
+      const handleFileChange = async (e) => { 
+        const file = e.target.files && e.target.files[0]; 
+        if (file) {
+          if(file.size > 4 * 1024 * 1024) { showNotification("Image size should be less than 4MB.", "error"); return; }
+          setFileName(file.name); 
+          setImagePreview(URL.createObjectURL(file));
+          setBase64Image(await fileToBase64(file)); 
+        } 
+      };
+
+      const handleClearForm = () => { formRef.current.reset(); setFileName(''); setBase64Image(null); setImagePreview(null); setCategory('General');};
+
+      const callAIApi = async (endpoint, payload, setLoading, onSuccess, onFailMsg) => {
+        setLoading(true);
+        try {
+          const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
+          if (!response.ok) throw new Error("API request failed.");
+          const result = await response.json();
+          onSuccess(result);
+        } catch (error) { 
+          console.error(`${onFailMsg} failed:`, error); 
+          showNotification(`Error: ${onFailMsg}. Please try again.`, "error");
+        } finally { setLoading(false); }
+      };
+
+      const handleSubmit = async (e) => { 
+        e.preventDefault(); 
+        const data = { 
+            title: titleRef.current.value, 
+            description: descriptionRef.current.value, 
+            location: locationRef.current.value, 
+            image: base64Image,
+            category: category
+        }; 
+        await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }); 
+        showNotification("✅ Report Submitted Successfully!", "success");
+        handleClearForm();
+        fetchReports();
+      };
+      
+      const StatusPill = ({ status }) => {
+        const styleMap = {
+          pending: 'bg-yellow-500/20 text-yellow-300 border-yellow-400/30',
+          verified: 'bg-green-500/20 text-green-300 border-green-400/30',
+          rejected: 'bg-red-500/20 text-red-300 border-red-400/30',
+          resolved: 'bg-blue-500/20 text-blue-300 border-blue-400/30',
+        };
+        return <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${styleMap[status]}`}>{status}</span>;
+      };
+
+      const CredibilityMeter = ({ score }) => {
+          const color = score > 75 ? 'text-green-400' : score > 50 ? 'text-yellow-400' : 'text-red-400';
+          return (
+              <div className="bg-white/5 p-4 rounded-xl text-center">
+                  <p className="text-sm text-slate-300 uppercase font-bold tracking-widest">Credibility Score</p>
+                  <p className={`text-4xl font-bold mt-2 ${color}`}>{score}</p>
+              </div>
+          );
+      };
+
+      const Leaderboard = () => (
+          <div className="bg-black/30 p-8 rounded-2xl shadow-xl w-full max-w-lg text-white backdrop-blur-xl border border-white/10 space-y-6">
+               <h2 className="text-3xl font-bold mb-2 text-center text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-400">🏆 Top City Guardians</h2>
+               <div className="space-y-4">
+                 {dummyLeaderboardData.map((reporter, index) => (
+                   <div key={index} className="flex items-center gap-4 bg-white/5 p-3 rounded-lg border-l-4 border-amber-400">
+                      <span className="text-xl font-bold w-8 text-center">{index + 1}</span>
+                      <div>
+                        <p className="font-bold text-slate-100">{reporter.name}</p>
+                        <p className="text-sm text-amber-300">{reporter.title}</p>
+                      </div>
+                      <p className="ml-auto font-bold text-lg text-green-400">₹{reporter.earnings}</p>
+                   </div>
+                 ))}
+               </div>
+          </div>
+      );
+      
+      return (
+        <PageWrapper gradient="bg-gradient-to-br from-blue-900 via-fuchsia-900 to-rose-800">
+          <BackButton navigate={navigate} />
+          <div className="flex flex-col xl:flex-row justify-center items-start gap-8 min-h-[calc(100vh-4rem)]">
+            <div className="w-full max-w-lg mx-auto flex-shrink-0">
+                <form ref={formRef} onSubmit={handleSubmit} className="bg-black/30 p-8 rounded-2xl shadow-xl text-white backdrop-blur-xl border border-white/10 space-y-6 sticky top-8">
+                  <h2 className="text-3xl font-bold mb-2 text-center text-transparent bg-clip-text bg-gradient-to-r from-fuchsia-300 to-rose-300">Submit a Civic Report</h2>
+                  <input ref={locationRef} type="text" placeholder="Location (e.g., 'potholes near Taj Hotel')" className="w-full p-3 rounded-lg bg-white/10 placeholder-gray-300/70 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 transition" required />
+                  <AIGlowButton loading={isGenerating} type="button" onClick={() => callAIApi('/api/ai/generate-suggestions', { location: locationRef.current.value }, setIsGenerating, (res) => { titleRef.current.value = res.title; descriptionRef.current.value = res.description; showNotification('AI Suggestions Loaded!', 'success'); }, 'Suggestion generation')}>Suggest Title & Description</AIGlowButton>
+                  <input ref={titleRef} type="text" placeholder="Title" className="w-full p-3 rounded-lg bg-white/10 placeholder-gray-300/70 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 transition" required />
+                  <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full p-3 rounded-lg bg-white/10 placeholder-gray-300/70 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 transition appearance-none">
+                      <option>Waste Management</option>
+                      <option>Infrastructure</option>
+                      <option>Illegal Construction</option>
+                      <option>Traffic Violation</option>
+                      <option>Women's Safety</option>
+                      <option>Public Nuisance</option>
+                      <option>General</option>
+                  </select>
+                  <textarea ref={descriptionRef} placeholder="Description" className="w-full p-3 rounded-lg bg-white/10 placeholder-gray-300/70 focus:outline-none focus:ring-2 focus:ring-fuchsia-400 transition" rows="3" required></textarea>
+                  <div>
+                    <label htmlFor="file-upload" className="w-full flex justify-center items-center gap-3 py-3 bg-slate-500/30 rounded-lg hover:bg-slate-500/50 font-bold transition-colors cursor-pointer border border-white/20">📎 <span>{fileName || 'Upload Photo Evidence'}</span></label>
+                    <input id="file-upload" onChange={handleFileChange} type="file" className="hidden" accept="image/*" />
+                  </div>
+                  {imagePreview && (
+                    <div className="space-y-4">
+                       <img src={imagePreview} alt="Preview" className="w-full h-auto max-h-40 object-cover rounded-lg"/>
+                       <AIGlowButton loading={isAnalyzing} type="button" onClick={() => callAIApi('/api/ai/analyze-image', { image: base64Image }, setIsAnalyzing, (res) => { descriptionRef.current.value = res.description; showNotification('Image Analyzed!', 'success'); }, 'Image analysis')}>Analyze Image for Description</AIGlowButton>
+                    </div>
+                  )}
+                  <div className="flex gap-4 pt-4 border-t border-white/10">
+                    <button type="button" onClick={handleClearForm} className="w-full py-3 bg-rose-600/80 rounded-lg hover:bg-rose-600 font-bold transition-colors">Clear</button>
+                    <button type="submit" className="w-full py-3 bg-gradient-to-r from-blue-600 to-cyan-500 rounded-lg hover:from-blue-500 hover:to-cyan-400 font-bold transition-all duration-300 shadow-lg hover:shadow-cyan-500/40 text-lg">Submit Report</button>
+                  </div>
+                </form>
+            </div>
+            <div className="w-full max-w-lg mx-auto flex-shrink-0 space-y-8">
+               <div className="bg-black/30 p-8 rounded-2xl shadow-xl text-white backdrop-blur-xl border border-white/10 space-y-6">
+                 <h2 className="text-3xl font-bold mb-2 text-center text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-cyan-300">My Dashboard</h2>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gradient-to-br from-green-500/20 to-cyan-500/20 p-4 rounded-xl text-center border border-green-400/30">
+                        <p className="text-sm text-green-200 uppercase font-bold tracking-widest">Earnings</p>
+                        <p className="text-4xl font-bold mt-2">₹{totalEarnings.toFixed(2)}</p>
+                    </div>
+                    <CredibilityMeter score={credibilityScore} />
+                 </div>
+                 <h3 className="text-xl font-bold text-center border-t border-white/10 pt-6">Submission History</h3>
+                 <div className="space-y-4 max-h-60 overflow-y-auto dark-scrollbar pr-2">
+                   {reports.length > 0 ? reports.map(report => (
+                     <div key={report._id} className="bg-white/5 p-4 rounded-lg cursor-pointer hover:bg-white/10" onClick={() => onReportClick(report)}>
+                        <div className="flex justify-between items-start">
+                           <p className="font-semibold text-slate-200 flex-1 pr-4">{report.title}</p>
+                           <StatusPill status={report.status} />
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">
+                          {(report.status === 'verified' || report.status === 'resolved') ? `+ ₹${REWARD_PER_VERIFIED_REPORT.toFixed(2)}` : 'No earnings yet'}
+                        </p>
+                     </div>
+                   )) : <p className="text-center text-slate-400">You haven't submitted any reports yet.</p>}
+                 </div>
+               </div>
+               <Leaderboard />
+            </div>
+          </div>
+        </PageWrapper>
+      );
+    };
+
+    const VolunteerPage = ({ navigate, reports, fetchReports, onReportClick }) => {
+      const handleUpdateStatus = async (id, status) => { await fetch(`/api/reports/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) }); fetchReports(); };
+      const pendingReports = reports.filter(r => r.status === 'pending');
+
+      const Badge = ({ tier }) => {
+        const styles = {
+            Gold: 'bg-amber-400 text-amber-900',
+            Silver: 'bg-slate-300 text-slate-700',
+            Bronze: 'bg-orange-400 text-orange-900',
+        };
+        return <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${styles[tier]}`}>{tier}</span>;
+      };
+
+      return (
+        <PageWrapper gradient="bg-gradient-to-br from-slate-900 via-emerald-900 to-teal-800">
+          <BackButton navigate={navigate} />
+          <h1 className="text-4xl font-bold mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-300">🛡 Volunteer Verification Hub</h1>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <div className="lg:col-span-1 bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10 h-fit lg:sticky lg:top-8">
+                <h2 className="text-2xl font-bold text-center mb-4 text-white">Top Volunteers</h2>
+                <div className="space-y-4">
+                    {dummyVolunteerData.map(v => (
+                        <div key={v.name} className="flex items-center gap-4 bg-white/5 p-3 rounded-lg">
+                            <img src={v.avatar} alt={v.name} className="w-12 h-12 rounded-full border-2 border-teal-400" />
+                            <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-bold text-slate-100">{v.name}</h3>
+                                  <Badge tier={v.badge} />
+                                </div>
+                                <p className="text-sm text-slate-300">{v.verifiedCount} verified</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="lg:col-span-3">
+              {pendingReports.length === 0 ? (
+                <div className="text-center text-gray-300 mt-20 bg-black/20 backdrop-blur-lg border border-white/10 rounded-xl p-8 max-w-md mx-auto">
+                    <h2 className="text-2xl font-bold text-white mb-2">All Clear!</h2>
+                    <p>There are no pending reports to verify. Great job, team!</p>
+                </div>
+               ) : (
+                <div className="grid md:grid-cols-2 gap-6">
+                  {pendingReports.map(report => (
+                    <div key={report._id} className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10 flex flex-col transform hover:-translate-y-1 transition-transform duration-300">
+                      <h2 className="text-xl font-bold text-white flex-1 cursor-pointer hover:text-cyan-300" onClick={() => onReportClick(report)}>{report.title}</h2>
+                      <p className="text-slate-300/80 mt-2 flex-grow text-sm">{report.description}</p>
+                      <p className="text-sm text-emerald-400 mt-4">📍 {report.location}</p>
+                       {report.image && <img src={`data:image/jpeg;base64,${report.image}`} alt="Report evidence" className="mt-4 rounded-lg w-full h-auto max-h-40 object-cover" />}
+                      <div className="flex gap-3 mt-5 border-t border-white/10 pt-4">
+                        <button onClick={() => handleUpdateStatus(report._id, 'verified')} className="w-full px-4 py-2 bg-green-600 rounded-lg hover:bg-green-500 transition font-semibold shadow-lg hover:shadow-green-500/30">Verify</button>
+                        <button onClick={() => handleUpdateStatus(report._id, 'rejected')} className="w-full px-4 py-2 bg-red-600 rounded-lg hover:bg-red-500 transition font-semibold shadow-lg hover:shadow-red-500/30">Reject</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </PageWrapper>
+      );
+    };
+    
+    const AuthorityPage = ({ navigate, reports, showNotification, fetchReports, onReportClick }) => {
+      const [summary, setSummary] = useState('');
+      const [isGenerating, setIsGenerating] = useState(false);
+      
+      const agraDummyReports = [
+        ...reports,
+        {_id: 'd1', title: 'Illegal Dumping near Dayalbagh', location: 'Dayalbagh, Agra', status: 'pending', createdAt: '2025-09-07T10:00:00Z', category: 'Waste Management'},
+        {_id: 'd2', title: 'Encroachment on Fatehabad Road', location: 'Fatehabad Road, Agra', status: 'verified', createdAt: '2025-09-06T11:00:00Z', category: 'Illegal Construction', fineCollected: 600, rewardDisbursed: 500, verifiedAt: '2025-09-06T12:00:00Z', resolvedAt: '2025-09-07T18:00:00Z'},
+        {_id: 'd3', title: 'Broken Sewer Line in Kamla Nagar', location: 'Kamla Nagar', status: 'verified', createdAt: '2025-09-06T15:00:00Z', category: 'Infrastructure', verifiedAt: '2025-09-06T16:00:00Z'},
+        {_id: 'd4', title: 'Pothole on MG Road', location: 'MG Road', status: 'rejected', createdAt: '2025-09-05T09:00:00Z', category: 'Infrastructure'},
+        {_id: 'd5', title: 'Unattended stray animals near Sikandra', location: 'Sikandra', status: 'pending', createdAt: '2025-09-04T12:00:00Z', category: 'Public Nuisance'},
+        {_id: 'd6', title: 'Garbage pile up at Sanjay Place', location: 'Sanjay Place', status: 'verified', createdAt: '2025-09-07T11:00:00Z', category: 'Waste Management', fineCollected: 600, rewardDisbursed: 500, verifiedAt: '2025-09-07T12:00:00Z', resolvedAt: '2025-09-07T19:00:00Z'},
+        {_id: 'd7', title: 'Malfunctioning streetlights in Taj Nagri', location: 'Taj Ganj', status: 'pending', createdAt: '2025-09-06T20:00:00Z', category: 'Infrastructure'},
+        {_id: 'd8', title: 'Open manhole near TDI Mall', location: 'Fatehabad Road, Agra', status: 'verified', createdAt: '2025-09-05T18:00:00Z', category: 'Infrastructure', verifiedAt: '2025-09-05T19:00:00Z'},
+        {_id: 'd9', title: 'Waste Burning at Yamuna Kinara', location: 'Civil Lines', status: 'verified', createdAt: '2025-09-07T14:00:00Z', category: 'Waste Management', verifiedAt: '2025-09-07T15:00:00Z'},
+        {_id: 'd10', title: 'Blocked drain in Loha Mandi', location: 'Kamla Nagar', status: 'pending', createdAt: '2025-09-07T08:00:00Z', category: 'Infrastructure'},
+      ];
+
+      const displayReports = agraDummyReports.map(r => ({ ...r, severity: ['Critical', 'High', 'Medium', 'Low'][Math.floor(Math.random() * 4)] }));
+
+      const handleGenerateSummary = async () => {
+         setIsGenerating(true);
+         try {
+             const response = await fetch("/api/ai/generate-dashboard-summary", { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reports: displayReports }) });
+             if (!response.ok) throw new Error("API request failed.");
+             const result = await response.json();
+             setSummary(result.summary);
+             showNotification("AI summary generated!", "success");
+         } catch(error) {
+             console.error("Summary generation failed:", error);
+             showNotification("Error generating summary.", "error");
+         } finally { setIsGenerating(false); }
+      };
+
+      const handleAuthorityAction = async (reportId, action) => {
+          const endpoint = action === 'fine' ? `/api/reports/${reportId}/fine` : `/api/reports/${reportId}/resolve`;
+          try {
+              const response = await fetch(endpoint, { method: 'PUT' });
+              if (!response.ok) throw new Error("Action failed");
+              showNotification(`Report successfully ${action === 'fine' ? 'fined and' : ''} resolved!`, "success");
+              fetchReports();
+          } catch (error) {
+              showNotification("Failed to update report.", "error");
+          }
+      };
+      
+      const totalReports = displayReports.length;
+      const peopleFined = displayReports.filter(r => r.fineCollected).length;
+      const revenueCollected = displayReports.reduce((sum, r) => sum + (r.fineCollected || 0), 0);
+      const rewardsDisbursed = displayReports.reduce((sum, r) => sum + (r.rewardDisbursed || 0), 0);
+      const municipalShare = revenueCollected - rewardsDisbursed;
+      const locationCounts = displayReports.reduce((acc, report) => { acc[report.location] = (acc[report.location] || 0) + 1; return acc; }, {});
+      const topHotspots = Object.entries(locationCounts).sort(([,a],[,b]) => b-a).slice(0, 3);
+      const problemCounts = displayReports.reduce((acc, report) => { if(report.category) { acc[report.category] = (acc[report.category] || 0) + 1; } return acc; }, {});
+      const topProblems = Object.entries(problemCounts).sort(([,a],[,b]) => b-a).slice(0, 3);
+      
+      const ActionableReports = () => {
+          const reportsToAction = displayReports.filter(r => r.status === 'verified' && !r.resolvedAt);
+          return (
+             <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10">
+                <h2 className="text-xl font-bold mb-4 text-slate-200">Actionable Reports</h2>
+                <div className="space-y-3 max-h-96 overflow-y-auto dark-scrollbar pr-2">
+                    {reportsToAction.length > 0 ? reportsToAction.map(report => (
+                        <div key={report._id} className="bg-white/5 p-3 rounded-lg">
+                            <p className="font-semibold cursor-pointer hover:text-cyan-300" onClick={() => onReportClick(report)}>{report.title}</p>
+                            <p className="text-xs text-gray-400">{report.location}</p>
+                            <div className="flex gap-2 mt-2">
+                                <button onClick={() => handleAuthorityAction(report._id, 'fine')} className="text-xs font-semibold bg-green-600 hover:bg-green-500 px-3 py-1 rounded-md">Issue Fine (₹600)</button>
+                                <button onClick={() => handleAuthorityAction(report._id, 'resolve')} className="text-xs font-semibold bg-gray-600 hover:bg-gray-500 px-3 py-1 rounded-md">Resolve (No Fine)</button>
+                            </div>
+                        </div>
+                    )) : <p className="text-center text-slate-400">No verified reports awaiting action.</p>}
+                </div>
+            </div>
+          );
+      };
+
+      return (
+         <PageWrapper gradient="bg-gradient-to-br from-slate-900 via-sky-900 to-indigo-800">
+            <BackButton navigate={navigate} />
+            <h1 className="text-4xl font-bold mb-8 text-center text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-indigo-300">🏛️ Authority Intelligence Dashboard</h1>
+            
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 text-center max-w-7xl mx-auto">
+                <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10"><p className="text-4xl font-bold">{totalReports}</p><p className="capitalize mt-1 text-gray-300">Total Reports</p></div>
+                <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10"><p className="text-4xl font-bold">{peopleFined}</p><p className="capitalize mt-1 text-gray-300">People Fined</p></div>
+                <div className="col-span-2 md:col-span-1 bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10"><p className="text-4xl font-bold">₹{revenueCollected.toLocaleString('en-IN')}</p><p className="capitalize mt-1 text-gray-300">Revenue Collected</p></div>
+                <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10"><p className="text-4xl font-bold">4.2 <span className="text-2xl">days</span></p><p className="capitalize mt-1 text-gray-300">Avg. Resolution</p></div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 max-w-7xl mx-auto">
+                <div className="lg:col-span-2 space-y-6">
+                    <AgraHeatmap reports={displayReports} />
+                    <ActionableReports />
+                </div>
+                <div className="space-y-6">
+                    <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10">
+                        <h2 className="text-xl font-bold mb-4 text-slate-200">Status Distribution</h2>
+                        <div className="h-64"><StatusChart reports={displayReports} /></div>
+                    </div>
+                    <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10">
+                        <h2 className="text-xl font-bold mb-4 text-slate-200">💰 Fund Distribution</h2>
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg"><span className="font-semibold text-sm">Citizen Rewards</span><span className="text-green-400 font-bold">₹{rewardsDisbursed.toLocaleString('en-IN')}</span></div>
+                            <div className="flex justify-between items-center bg-white/5 p-3 rounded-lg"><span className="font-semibold text-sm">Municipal Share</span><span className="text-sky-400 font-bold">₹{municipalShare.toLocaleString('en-IN')}</span></div>
+                        </div>
+                    </div>
+                    <div className="bg-black/30 p-6 rounded-2xl shadow-xl backdrop-blur-xl border border-white/10">
+                        <h2 className="text-xl font-bold mb-4 text-slate-200">💡 Top Civic Problems</h2>
+                        <ul className="space-y-3">{topProblems.map(([problem, count], index) => (<li key={index} className="flex justify-between items-center bg-white/5 p-3 rounded-lg"><span className="font-semibold text-sm">{index + 1}. {problem}</span><span className="bg-sky-600 text-white text-xs font-bold px-2 py-1 rounded-full">{count} Reports</span></li>))}</ul>
+                    </div>
+                </div>
+            </div>
+         </PageWrapper>
+      )
+    };
+    
+    const SocialFeedPost = ({ post }) => {
+        const [showComments, setShowComments] = useState(false);
+        const [comments, setComments] = useState(post.comments || []);
+        const [newComment, setNewComment] = useState('');
+        const [upvotes, setUpvotes] = useState(post.upvotes);
+
+        const handleCommentSubmit = (e) => {
+            e.preventDefault();
+            if (!newComment.trim()) return;
+            setComments([...comments, { user: 'You', text: newComment }]);
+            setNewComment('');
+        };
+
+        const StatusBadge = () => {
+            if (post.resolved) {
+                return (
+                    <div className="absolute top-4 right-4 flex items-center gap-2 bg-green-500/80 text-white font-bold px-3 py-1 rounded-full text-sm backdrop-blur-sm border border-green-300 z-10">
+                        <ResolvedIcon />
+                        <span>Resolved</span>
+                    </div>
+                );
+            }
+            return (
+                <div className="absolute top-4 right-4 flex items-center gap-2 bg-yellow-500/80 text-white font-bold px-3 py-1 rounded-full text-sm backdrop-blur-sm border border-yellow-300 z-10">
+                    <PendingIcon />
+                    <span>Pending Action</span>
+                </div>
+            );
+        };
+
+        const cardStyle = post.type === 'offender'
+          ? "border-red-500/50"
+          : "border-white/10";
+        const titleStyle = post.type === 'offender'
+          ? "text-red-300"
+          : "text-amber-300";
+
+        return (
+            <div className={`relative bg-black/30 p-5 rounded-2xl shadow-lg backdrop-blur-xl border text-white flex flex-col w-full max-w-2xl ${cardStyle}`}>
+                <StatusBadge />
+                <div className="flex items-center mb-4">
+                    <img src={post.reporter.avatar} alt={post.reporter.name} className="w-12 h-12 rounded-full mr-4 border-2 border-amber-400" />
+                    <div>
+                        <p className="font-bold text-lg text-white">{post.reporter.name}</p>
+                        <p className="text-xs text-gray-400">{post.timestamp}</p>
+                    </div>
+                </div>
+                <h2 className={`text-xl font-semibold mb-2 ${titleStyle}`}>{post.title}</h2>
+                <p className="mt-1 text-sm flex-grow text-gray-300/90">{post.description}</p>
+                <p className="text-xs mt-3 font-semibold text-gray-400">📍 {post.location}</p>
+                
+                {post.type === 'issue' && post.imageUrl && <img src={post.imageUrl} alt={post.title} className="w-full h-auto max-h-[400px] object-cover rounded-lg my-4" />}
+
+                {post.type === 'offender' && (
+                    <div className="my-4 bg-red-900/20 p-4 rounded-lg border border-red-500/30">
+                        <h3 className="font-bold text-red-200 mb-2">Offender Details</h3>
+                        <div className="flex items-center gap-4">
+                            <img src={post.offender.proofUrl} alt="Proof of violation" className="w-24 h-24 object-cover rounded-lg filter blur-sm" />
+                            <div>
+                                <p className="font-semibold text-lg">{post.offender.name}</p>
+                                <span className="mt-1 inline-block px-3 py-1 text-sm font-semibold rounded-full bg-green-500 text-white">Fine {post.offender.fineStatus}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex justify-between items-center mt-2 border-t pt-3 border-white/10">
+                    <button onClick={() => setUpvotes(v => v+1)} className="flex items-center gap-2 transition group text-gray-300 hover:text-white">
+                        <UpvoteIcon />
+                        <span className="font-semibold">{upvotes || 0}</span>
+                    </button>
+                    <button onClick={() => setShowComments(!showComments)} className="flex items-center gap-2 transition group text-gray-300 hover:text-white">
+                        <CommentIcon />
+                        <span className="font-semibold">{comments.length} Comments</span>
+                    </button>
+                </div>
+                {showComments && (
+                    <div className="mt-4 border-t pt-4 border-white/10">
+                        <div className="space-y-2 max-h-48 overflow-y-auto dark-scrollbar pr-2 mb-4">
+                            {comments.map((c, i) => (
+                                <div key={i} className="text-sm p-2 rounded-lg bg-black/20">
+                                    <span className="font-semibold text-gray-300">{c.user}: </span>
+                                    <span className="text-gray-400">{c.text}</span>
+                                </div>
+                            ))}
+                        </div>
+                        <form onSubmit={handleCommentSubmit} className="flex gap-2">
+                            <input value={newComment} onChange={e => setNewComment(e.target.value)} type="text" placeholder="Add a comment..." className="w-full p-2 rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm bg-white/10 text-white" />
+                            <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-500 transition text-sm font-semibold">Post</button>
+                        </form>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const SocialFeedPage = ({ navigate }) => {
+        return (
+            <PageWrapper gradient="bg-gradient-to-br from-gray-800 via-slate-900 to-black">
+                <BackButton navigate={navigate} />
+                <div className="text-center mb-10">
+                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-400">🌍 Public Accountability Feed</h1>
+                    <p className="text-gray-300/80 mt-2">Verified civic issues reported by the citizens of Agra.</p>
+                </div>
+                {dummySocialFeedData.length === 0 ? (
+                     <div className="text-center text-gray-300 mt-20 bg-black/20 backdrop-blur-lg border border-white/10 rounded-xl p-8 max-w-md mx-auto">
+                        <h2 className="text-2xl font-bold text-white mb-2">No Reports Yet</h2>
+                        <p>Once volunteers verify new submissions, they will appear here live.</p>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center gap-8">
+                        {dummySocialFeedData.map(post => <SocialFeedPost key={post.id} post={post} />)}
+                    </div>
+                )}
+            </PageWrapper>
+        );
+    };
+    
+    // --- MAIN APP COMPONENT ---
+    const App = () => {
+      const [route, setRoute] = useState(window.location.hash.substring(1) || 'home');
+      const [reports, setReports] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [notification, setNotification] = useState({ message: '', type: '' });
+      const [selectedReport, setSelectedReport] = useState(null);
+
+      const handleHashChange = () => setRoute(window.location.hash.substring(1) || 'home');
+      useEffect(() => { window.addEventListener('hashchange', handleHashChange); return () => window.removeEventListener('hashchange', handleHashChange); }, []);
+      
+      const fetchReports = async () => { 
+        try { 
+          const res = await fetch("/api/reports"); 
+          const data = await res.json(); 
+          setReports(data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))); 
+        } catch (error) { 
+          console.error("Failed to fetch reports:", error); 
+          showNotification("Could not load report data.", "error");
+        } finally { setLoading(false); } 
+      };
+      useEffect(() => { fetchReports(); }, []);
+      
+      const navigate = (path) => { window.location.hash = path; };
+      
+      const showNotification = (message, type) => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification({ message: '', type: '' }), 3000);
+      };
+
+      const handleReportClick = (report) => setSelectedReport(report);
+      const handleCloseModal = () => setSelectedReport(null);
+
+      const renderPage = () => { 
+        const pageProps = { navigate, reports, fetchReports, showNotification, onReportClick: handleReportClick };
+        if(loading && route !== 'home' && route !== 'citizen' && route !== 'social') {
+             return <PageWrapper gradient="bg-gradient-to-br from-slate-900 to-black"><div className="flex justify-center items-center h-screen"><div className="spinner"></div></div></PageWrapper>;
+        }
+        switch (route) { 
+          case 'citizen': return <CitizenPage {...pageProps} />; 
+          case 'volunteer': return <VolunteerPage {...pageProps} />; 
+          case 'authority': return <AuthorityPage {...pageProps} />; 
+          case 'social': return <SocialFeedPage navigate={navigate} />; 
+          case 'home': 
+          default: return <HomePage navigate={navigate} />; 
+        } 
+      };
+
+      return (
+        <div>
+          <Notification message={notification.message} type={notification.type} />
+          <ReportDetailModal report={selectedReport} onClose={handleCloseModal} />
+          {renderPage()}
+        </div>
+      );
+    };
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
+
