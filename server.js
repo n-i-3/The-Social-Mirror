@@ -11,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const DB_FILE = path.join(__dirname, 'reports.json');
+const PORT = process.env.PORT || 5000;
 
 // --- Helper Functions for Database ---
 const readReports = () => {
