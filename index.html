@@ -93,7 +93,7 @@
             description: 'An individual was reported for littering public property near the main entrance of the Taj Nature Walk. This behavior contributes to the degradation of our city\'s landmarks.',
             location: 'Taj Nature Walk, Agra',
             offender: {
-                name: 'Arun Verma',
+                name: 'Arun Sharma',
                 proofUrl: 'https://placehold.co/600x400/fecaca/991b1b?text=Proof+of+Violation',
                 fineStatus: 'Paid',
             },
@@ -102,7 +102,7 @@
         {
             id: 'agra-1',
             type: 'issue',
-            reporter: { name: 'Priya Sharma', avatar: 'https://i.pravatar.cc/150?img=1' },
+            reporter: { name: 'OM Singh', avatar: 'https://i.pravatar.cc/150?img=1' },
             timestamp: '2 hours ago',
             title: 'Unattended Waste near Taj Mahal East Gate',
             description: 'Large amounts of tourist-generated waste are piling up near the East Gate parking area, creating an unsanitary environment unbecoming of a world heritage site.',
@@ -111,14 +111,14 @@
             upvotes: 185,
             comments: [
               { user: 'Amit Singh', text: 'This is embarrassing for our city. Needs immediate cleanup.' },
-              { user: 'Sneha Gupta', text: 'Absolutely agree. The authorities must act fast.' }
+              { user: 'Sneha Garg', text: 'Absolutely agree. The authorities must act fast.' }
             ],
             resolved: true,
         },
         {
             id: 'agra-2',
             type: 'issue',
-            reporter: { name: 'Rajesh Kumar', avatar: 'https://i.pravatar.cc/150?img=2' },
+            reporter: { name: 'Rajesh kumar', avatar: 'https://i.pravatar.cc/150?img=2' },
             timestamp: '8 hours ago',
             title: 'Malfunctioning Traffic Light at Sadar Bazaar',
             description: 'The main traffic light at the Sadar Bazaar crossing is stuck on red, causing massive traffic jams and chaos, especially during evening hours.',
@@ -133,13 +133,13 @@
     ];
 
     const dummyVolunteerData = [
-        { name: 'Aditya Singh', avatar: 'https://i.pravatar.cc/150?img=5', verifiedCount: 128, badge: 'Gold' },
-        { name: 'Neha Sharma', avatar: 'https://i.pravatar.cc/150?img=6', verifiedCount: 94, badge: 'Silver' },
-        { name: 'Vikram Rathore', avatar: 'https://i.pravatar.cc/150?img=7', verifiedCount: 67, badge: 'Bronze' },
+        { name: 'Neha verma', avatar: 'https://i.pravatar.cc/150?img=5', verifiedCount: 128, badge: 'Gold' },
+        { name: 'Aditya Singh', avatar: 'https://i.pravatar.cc/150?img=6', verifiedCount: 94, badge: 'Silver' },
+        { name: 'Vikram kumar', avatar: 'https://i.pravatar.cc/150?img=7', verifiedCount: 67, badge: 'Bronze' },
     ];
     
     const dummyLeaderboardData = [
-        { name: 'Priya Sharma', earnings: 4500, title: 'Cleanliness Champion' },
+        { name: 'Shashwat verma', earnings: 4500, title: 'Cleanliness Champion' },
         { name: 'Rajesh Kumar', earnings: 3000, title: 'City Guardian' },
         { name: 'Amit Singh', earnings: 1500, title: 'Civic Watchdog' },
     ];
@@ -830,7 +830,7 @@
             <PageWrapper gradient="bg-gradient-to-br from-gray-800 via-slate-900 to-black">
                 <BackButton navigate={navigate} />
                 <div className="text-center mb-10">
-                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-400">🌍 Public Accountability Feed</h1>
+                    <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-orange-400">Public Accountability Wall</h1>
                     <p className="text-gray-300/80 mt-2">Verified civic issues reported by the citizens of Agra.</p>
                 </div>
                 {dummySocialFeedData.length === 0 ? (
