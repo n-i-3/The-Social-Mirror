@@ -67,7 +67,7 @@ app.put("/api/reports/:id", (req, res) => {
   const { status } = req.body;
   const reportIndex = reports.findIndex((r) => r.id === id);
   if (reportIndex === -1) return res.status(404).json({ message: "Report not found" });
-
+  
   reports[reportIndex].status = status;
   if (status === 'verified') {
     reports[reportIndex].verifiedAt = new Date().toISOString();
@@ -78,29 +78,29 @@ app.put("/api/reports/:id", (req, res) => {
 });
 
 app.put("/api/reports/:id/fine", (req, res) => {
-  const { id } = req.params;
-  const reportIndex = reports.findIndex((r) => r.id === id);
-  if (reportIndex === -1) return res.status(404).json({ message: "Report not found" });
+    const { id } = req.params;
+    const reportIndex = reports.findIndex((r) => r.id === id);
+    if (reportIndex === -1) return res.status(404).json({ message: "Report not found" });
 
-  reports[reportIndex].fineCollected = 600;
-  reports[reportIndex].rewardDisbursed = 500;
-  reports[reportIndex].status = 'resolved';
-  reports[reportIndex].resolvedAt = new Date().toISOString();
-  writeReports(reports);
-  console.log(`Fine issued for report ${id}`);
-  res.json(reports[reportIndex]);
+    reports[reportIndex].fineCollected = 600;
+    reports[reportIndex].rewardDisbursed = 500;
+    reports[reportIndex].status = 'resolved';
+    reports[reportIndex].resolvedAt = new Date().toISOString();
+    writeReports(reports);
+    console.log(`Fine issued for report ${id}`);
+    res.json(reports[reportIndex]);
 });
 
 app.put("/api/reports/:id/resolve", (req, res) => {
-  const { id } = req.params;
-  const reportIndex = reports.findIndex((r) => r.id === id);
-  if (reportIndex === -1) return res.status(404).json({ message: "Report not found" });
+    const { id } = req.params;
+    const reportIndex = reports.findIndex((r) => r.id === id);
+    if (reportIndex === -1) return res.status(404).json({ message: "Report not found" });
 
-  reports[reportIndex].status = 'resolved';
-  reports[reportIndex].resolvedAt = new Date().toISOString();
-  writeReports(reports);
-  console.log(`Report ${id} marked as resolved (no fine)`);
-  res.json(reports[reportIndex]);
+    reports[reportIndex].status = 'resolved';
+    reports[reportIndex].resolvedAt = new Date().toISOString();
+    writeReports(reports);
+    console.log(`Report ${id} marked as resolved (no fine)`);
+    res.json(reports[reportIndex]);
 });
 
 
@@ -112,26 +112,26 @@ if (!GEMINI_API_KEY) {
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent";
 
 const callGeminiApi = async (payload, res, errorMsg) => {
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ message: "Server is not configured with an API key." });
-  }
-  try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-      const errorBody = await response.json();
-      console.error("Gemini API Error:", errorBody);
-      throw new Error(errorBody.error.message || "Failed to call Gemini API");
+    if (!GEMINI_API_KEY) {
+        return res.status(500).json({ message: "Server is not configured with an API key." });
     }
-    const data = await response.json();
-    return data;
-  } catch (error) {
-    console.error(`${errorMsg} failed:`, error);
-    res.status(500).json({ message: errorMsg });
-  }
+    try {
+        const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) {
+            const errorBody = await response.json();
+            console.error("Gemini API Error:", errorBody);
+            throw new Error(errorBody.error.message || "Failed to call Gemini API");
+        }
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`${errorMsg} failed:`, error);
+        res.status(500).json({ message: errorMsg });
+    }
 };
 
 app.post("/api/ai/generate-suggestions", async (req, res) => {
@@ -144,14 +144,14 @@ app.post("/api/ai/generate-suggestions", async (req, res) => {
   };
 
   const data = await callGeminiApi(payload, res, "Failed to generate AI suggestions.");
-
+  
   // Safety Check Added Here
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (text) {
-    res.json(JSON.parse(text));
+     res.json(JSON.parse(text));
   } else {
-    console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
-    res.status(500).json({ message: "Failed to parse AI response for suggestions." });
+     console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
+     res.status(500).json({ message: "Failed to parse AI response for suggestions." });
   }
 });
 
@@ -166,7 +166,7 @@ app.post("/api/ai/analyze-image", async (req, res) => {
       ]
     }],
   };
-
+  
   const data = await callGeminiApi(payload, res, "Failed to analyze image.");
 
   // Safety Check Added Here
@@ -174,61 +174,59 @@ app.post("/api/ai/analyze-image", async (req, res) => {
   if (text) {
     res.json({ description: text });
   } else {
-    console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
-    res.status(500).json({ message: "Failed to parse AI response for image analysis." });
+     console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
+     res.status(500).json({ message: "Failed to parse AI response for image analysis." });
   }
 });
 
 app.post("/api/ai/categorize-report", async (req, res) => {
-  const { title, description } = req.body;
-  const systemPrompt = `You are an AI classifier for a civic reporting app. Based on the report's title and description, categorize it into one of the following options: "Waste Management", "Infrastructure", "Illegal Construction", "Traffic Violation", "Women's Safety", "Public Nuisance", or "General". Output a valid JSON object with only a "category" key. For example: {"category": "Waste Management"}`;
-  const payload = {
-    contents: [{ parts: [{ text: `Title: ${title}\nDescription: ${description}` }] }],
-    systemInstruction: { parts: [{ text: systemPrompt }] },
-    generationConfig: { responseMimeType: "application/json" }
-  };
+    const { title, description } = req.body;
+    const systemPrompt = `You are an AI classifier for a civic reporting app. Based on the report's title and description, categorize it into one of the following options: "Waste Management", "Infrastructure", "Illegal Construction", "Traffic Violation", "Women's Safety", "Public Nuisance", or "General". Output a valid JSON object with only a "category" key. For example: {"category": "Waste Management"}`;
+    const payload = {
+        contents: [{ parts: [{ text: `Title: ${title}\nDescription: ${description}` }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: { responseMimeType: "application/json" }
+    };
 
-  const data = await callGeminiApi(payload, res, "Failed to categorize report.");
+    const data = await callGeminiApi(payload, res, "Failed to categorize report.");
 
-  // Safety Check Added Here
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (text) {
-    try {
-      const parsed = JSON.parse(text);
-      res.json({ category: parsed.category || "General" });
-    } catch (e) {
-      res.json({ category: "General" });
+    // Safety Check Added Here
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) {
+        try {
+            const parsed = JSON.parse(text);
+            res.json({ category: parsed.category || "General" });
+        } catch (e) {
+            res.json({ category: "General" });
+        }
+    } else {
+        console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
+        res.status(500).json({ message: "Failed to parse AI response for categorization." });
     }
-  } else {
-    console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
-    res.status(500).json({ message: "Failed to parse AI response for categorization." });
-  }
 });
 
 app.post("/api/ai/generate-dashboard-summary", async (req, res) => {
-  const { reports } = req.body;
-  const systemPrompt = `You are an expert civic data analyst for the city of Agra, India. Analyze the provided JSON of civic reports. Identify the top 2-3 common issues, pinpoint the busiest locations, and suggest one concrete, actionable step for the municipal authorities. Provide a concise, professional summary as a single block of text. Do not use markdown formatting.`;
-  const payload = {
-    contents: [{ parts: [{ text: `Here are the recent reports: ${JSON.stringify(reports)}` }] }],
-    systemInstruction: { parts: [{ text: systemPrompt }] }
-  };
+    const { reports } = req.body;
+    const systemPrompt = `You are an expert civic data analyst for the city of Agra, India. Analyze the provided JSON of civic reports. Identify the top 2-3 common issues, pinpoint the busiest locations, and suggest one concrete, actionable step for the municipal authorities. Provide a concise, professional summary as a single block of text. Do not use markdown formatting.`;
+    const payload = {
+        contents: [{ parts: [{ text: `Here are the recent reports: ${JSON.stringify(reports)}` }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] }
+    };
 
-  const data = await callGeminiApi(payload, res, "Failed to generate dashboard summary.");
-
-  // Safety Check Added Here
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (text) {
-    res.json({ summary: text });
-  } else {
-    console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
-    res.status(500).json({ message: "Failed to parse AI response for summary." });
-  }
+    const data = await callGeminiApi(payload, res, "Failed to generate dashboard summary.");
+    
+    // Safety Check Added Here
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) {
+        res.json({ summary: text });
+    } else {
+        console.error("Unexpected API response structure:", JSON.stringify(data, null, 2));
+        res.status(500).json({ message: "Failed to parse AI response for summary." });
+    }
 });
 
 
-// --- Server ---
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
+
 
 // Serve static files from current directory
 app.use(express.static(__dirname));
@@ -238,5 +236,5 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-
+// Start the server
 app.listen(PORT, () => console.log(`🚀 Server running at http://localhost:${PORT}`));
